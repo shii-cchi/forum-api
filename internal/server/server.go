@@ -8,6 +8,7 @@ import (
 	_ "github.com/lib/pq"
 	"github.com/shii-cchi/forum-api/internal/database"
 	"github.com/shii-cchi/forum-api/internal/handlers"
+	"github.com/shii-cchi/forum-api/pkg/hash"
 	"log"
 	"net/http"
 	"os"
@@ -44,9 +45,16 @@ func NewServer(r chi.Router) (*Server, error) {
 		return nil, err
 	}
 
-	queries := database.New(conn)
+	salt := os.Getenv("SALT_STRING")
 
-	handler := handlers.New(queries)
+	if salt == "" {
+		return nil, errors.New("SALT_STRING is not found")
+	}
+
+	queries := database.New(conn)
+	hasher := hash.NewSHA1Hasher(salt)
+
+	handler := handlers.New(queries, hasher)
 	handler.RegisterHTTPEndpoints(r)
 
 	log.Printf("Server starting on port %s", port)

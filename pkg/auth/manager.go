@@ -4,14 +4,12 @@ import (
 	"errors"
 	"fmt"
 	"github.com/dgrijalva/jwt-go"
-	"math/rand"
 	"time"
 )
 
 type TokenManager interface {
 	NewJWT(userId string, ttl time.Duration) (string, error)
 	Parse(accessToken string) (string, error)
-	NewRefreshToken() (string, error)
 }
 
 type Manager struct {
@@ -38,19 +36,23 @@ func (m *Manager) NewJWT(userId string, ttl time.Duration) (string, error) {
 }
 
 func (m *Manager) Parse(accessToken string) (string, error) {
+	token, err := jwt.Parse(accessToken, func(token *jwt.Token) (i interface{}, err error) {
+		if _, ok := token.Method.(*jwt.SigningMethodHMAC); !ok {
+			return nil, fmt.Errorf("Unexpected signing method: %v", token.Header["alg"])
+		}
 
-}
+		return []byte(m.signingKey), nil
+	})
 
-func (m *Manager) NewRefreshToken() (string, error) {
-	b := make([]byte, 32)
-
-	s := rand.NewSource(time.Now().Unix())
-	r := rand.New(s)
-
-	_, err := r.Read(b)
 	if err != nil {
-		return "", err
+		return "", nil
 	}
 
-	return fmt.Sprintf("%x", b), nil
+	claims, ok := token.Claims.(jwt.MapClaims)
+
+	if !ok {
+		return "", fmt.Errorf("Error get user claims from token")
+	}
+
+	return claims["sub"].(string), nil
 }
