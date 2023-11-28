@@ -27,6 +27,31 @@ func (q *Queries) AddToken(ctx context.Context, arg AddTokenParams) error {
 	return err
 }
 
+const checkDataToLogin = `-- name: CheckDataToLogin :one
+SELECT id, email, password, login, token
+FROM users
+WHERE (email = $1 AND password = $2) OR (login = $3 AND password = $2)
+`
+
+type CheckDataToLoginParams struct {
+	Email    string
+	Password string
+	Login    string
+}
+
+func (q *Queries) CheckDataToLogin(ctx context.Context, arg CheckDataToLoginParams) (User, error) {
+	row := q.db.QueryRowContext(ctx, checkDataToLogin, arg.Email, arg.Password, arg.Login)
+	var i User
+	err := row.Scan(
+		&i.ID,
+		&i.Email,
+		&i.Password,
+		&i.Login,
+		&i.Token,
+	)
+	return i, err
+}
+
 const checkUserIsExist = `-- name: CheckUserIsExist :one
 SELECT COUNT(*)
 FROM users
@@ -68,4 +93,15 @@ func (q *Queries) CreateUser(ctx context.Context, arg CreateUserParams) (User, e
 		&i.Token,
 	)
 	return i, err
+}
+
+const logoutUser = `-- name: LogoutUser :exec
+UPDATE users
+SET token = ''
+WHERE id = $1
+`
+
+func (q *Queries) LogoutUser(ctx context.Context, id uuid.UUID) error {
+	_, err := q.db.ExecContext(ctx, logoutUser, id)
+	return err
 }
