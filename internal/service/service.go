@@ -4,23 +4,25 @@ import (
 	"context"
 	"errors"
 	"github.com/google/uuid"
+	"github.com/shii-cchi/forum-api/internal/config"
 	"github.com/shii-cchi/forum-api/internal/database"
 	"github.com/shii-cchi/forum-api/internal/handlers/dto"
 	"github.com/shii-cchi/forum-api/internal/models"
 	"github.com/shii-cchi/forum-api/pkg/auth"
 	"github.com/shii-cchi/forum-api/pkg/hash"
-	"os"
 )
 
 type UserService struct {
 	queries *database.Queries
 	hasher  *hash.SHA1Hasher
+	cfg     *config.Config
 }
 
-func NewUserService(q *database.Queries, h *hash.SHA1Hasher) *UserService {
+func NewUserService(q *database.Queries, h *hash.SHA1Hasher, c *config.Config) *UserService {
 	return &UserService{
 		queries: q,
 		hasher:  h,
+		cfg:     c,
 	}
 }
 
@@ -54,17 +56,7 @@ func (s UserService) CreateUser(ctx context.Context, newUser *dto.UserDto) (inte
 		return nil, "", err
 	}
 
-	refreshToken, err := CreateToken("REFRESH_SIGNING_KEY", "REFRESH_TTL", user.ID.String())
-
-	if err != nil {
-		return nil, "", err
-	}
-
-	accessToken, err := CreateToken("ACCESS_SIGNING_KEY", "ACCESS_TTL", user.ID.String())
-
-	if err != nil {
-		return nil, "", err
-	}
+	accessToken, refreshToken, err := s.CreateTokens(user.ID.String())
 
 	err = s.queries.AddToken(ctx, database.AddTokenParams{
 		ID:    user.ID,
@@ -84,12 +76,7 @@ func (s UserService) CreateUser(ctx context.Context, newUser *dto.UserDto) (inte
 }
 
 func (s UserService) Logout(ctx context.Context, accessToken string) error {
-	signingKey := os.Getenv("ACCESS_SIGNING_KEY")
-	if signingKey == "" {
-		return errors.New("ACCESS_SIGNING_KEY is not found in the environment")
-	}
-
-	m, err := auth.NewManager(signingKey)
+	m, err := auth.NewManager(s.cfg.AccessSigningKey)
 
 	if err != nil {
 		return err
@@ -131,13 +118,7 @@ func (s UserService) Login(ctx context.Context, checkedUser *dto.UserDto) (inter
 		return nil, "", errors.New("Wrong credentials")
 	}
 
-	refreshToken, err := CreateToken("REFRESH_SIGNING_KEY", "REFRESH_TTL", user.ID.String())
-
-	if err != nil {
-		return nil, "", err
-	}
-
-	accessToken, err := CreateToken("ACCESS_SIGNING_KEY", "ACCESS_TTL", user.ID.String())
+	accessToken, refreshToken, err := s.CreateTokens(user.ID.String())
 
 	if err != nil {
 		return nil, "", err
@@ -154,6 +135,54 @@ func (s UserService) Login(ctx context.Context, checkedUser *dto.UserDto) (inter
 
 	return models.UserForResponse{
 		ID:    user.ID,
+		Email: user.Email,
+		Login: user.Login,
+		Token: accessToken,
+	}, refreshToken, nil
+}
+
+func (s UserService) Refresh(ctx context.Context, refreshToken string) (interface{}, string, error) {
+	m, err := auth.NewManager(s.cfg.RefreshSigningKey)
+
+	if err != nil {
+		return nil, "", err
+	}
+
+	userIdStr, err := m.Parse(refreshToken)
+
+	if err != nil {
+		return nil, "", err
+	}
+
+	userId, err := uuid.Parse(userIdStr)
+
+	if err != nil {
+		return nil, "", err
+	}
+
+	accessToken, refreshToken, err := s.CreateTokens(userIdStr)
+
+	if err != nil {
+		return nil, "", err
+	}
+
+	err = s.queries.AddToken(ctx, database.AddTokenParams{
+		ID:    userId,
+		Token: refreshToken,
+	})
+
+	if err != nil {
+		return nil, "", err
+	}
+
+	user, err := s.queries.GetUser(ctx, userId)
+
+	if err != nil {
+		return nil, "", err
+	}
+
+	return models.UserForResponse{
+		ID:    userId,
 		Email: user.Email,
 		Login: user.Login,
 		Token: accessToken,

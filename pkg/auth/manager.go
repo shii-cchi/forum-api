@@ -9,7 +9,8 @@ import (
 
 type TokenManager interface {
 	NewJWT(userId string, ttl time.Duration) (string, error)
-	Parse(accessToken string) (string, error)
+	Parse(Token string) (string, error)
+	IsValidToken(refreshToken string) (string, error)
 }
 
 type Manager struct {
@@ -45,7 +46,7 @@ func (m *Manager) Parse(accessToken string) (string, error) {
 	})
 
 	if err != nil {
-		return "", nil
+		return "", err
 	}
 
 	claims, ok := token.Claims.(jwt.MapClaims)
@@ -55,4 +56,24 @@ func (m *Manager) Parse(accessToken string) (string, error) {
 	}
 
 	return claims["sub"].(string), nil
+}
+
+func (m *Manager) IsValidToken(validatedToken string) (bool, error) {
+	token, err := jwt.Parse(validatedToken, func(token *jwt.Token) (i interface{}, err error) {
+		if _, ok := token.Method.(*jwt.SigningMethodHMAC); !ok {
+			return nil, fmt.Errorf("Unexpected signing method: %v", token.Header["alg"])
+		}
+
+		return []byte(m.signingKey), nil
+	})
+
+	if err != nil {
+		return false, err
+	}
+
+	if !token.Valid {
+		return false, fmt.Errorf("Token is not valid")
+	}
+
+	return true, nil
 }

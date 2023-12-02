@@ -95,6 +95,25 @@ func (q *Queries) CreateUser(ctx context.Context, arg CreateUserParams) (User, e
 	return i, err
 }
 
+const getUser = `-- name: GetUser :one
+SELECT id, email, password, login, token
+FROM users
+WHERE id = $1
+`
+
+func (q *Queries) GetUser(ctx context.Context, id uuid.UUID) (User, error) {
+	row := q.db.QueryRowContext(ctx, getUser, id)
+	var i User
+	err := row.Scan(
+		&i.ID,
+		&i.Email,
+		&i.Password,
+		&i.Login,
+		&i.Token,
+	)
+	return i, err
+}
+
 const logoutUser = `-- name: LogoutUser :exec
 UPDATE users
 SET token = ''

@@ -2,16 +2,14 @@ package server
 
 import (
 	"database/sql"
-	"errors"
 	"github.com/go-chi/chi"
-	"github.com/joho/godotenv"
 	_ "github.com/lib/pq"
+	"github.com/shii-cchi/forum-api/internal/config"
 	"github.com/shii-cchi/forum-api/internal/database"
 	"github.com/shii-cchi/forum-api/internal/handlers"
 	"github.com/shii-cchi/forum-api/pkg/hash"
 	"log"
 	"net/http"
-	"os"
 )
 
 type Server struct {
@@ -21,47 +19,29 @@ type Server struct {
 }
 
 func NewServer(r chi.Router) (*Server, error) {
-	err := godotenv.Load(".env")
+	cfg, err := config.LoadConfig()
 
 	if err != nil {
 		return nil, err
 	}
 
-	port := os.Getenv("PORT")
-
-	if port == "" {
-		return nil, errors.New("PORT is not found")
-	}
-
-	dbURL := os.Getenv("DB_URL")
-
-	if dbURL == "" {
-		return nil, errors.New("DB_URL is not found")
-	}
-
-	conn, err := sql.Open("postgres", dbURL)
+	conn, err := sql.Open("postgres", cfg.DbURI)
 
 	if err != nil {
 		return nil, err
-	}
-
-	salt := os.Getenv("SALT_STRING")
-
-	if salt == "" {
-		return nil, errors.New("SALT_STRING is not found")
 	}
 
 	queries := database.New(conn)
-	hasher := hash.NewSHA1Hasher(salt)
+	hasher := hash.NewSHA1Hasher(cfg.SaltString)
 
-	handler := handlers.New(queries, hasher)
+	handler := handlers.New(queries, hasher, cfg)
 	handler.RegisterHTTPEndpoints(r)
 
-	log.Printf("Server starting on port %s", port)
+	log.Printf("Server starting on port %s", cfg.Port)
 
 	return &Server{
 		httpServer: &http.Server{
-			Addr:    ":" + port,
+			Addr:    ":" + cfg.Port,
 			Handler: r,
 		},
 		httpHandler: handler,

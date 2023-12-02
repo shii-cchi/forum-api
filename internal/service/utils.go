@@ -1,40 +1,49 @@
 package service
 
 import (
-	"fmt"
 	"github.com/shii-cchi/forum-api/pkg/auth"
-	"os"
 	"time"
 )
 
-func CreateToken(key1 string, key2 string, userId string) (string, error) {
-	signingKey := os.Getenv(key1)
-	if signingKey == "" {
-		return "", fmt.Errorf("%s is not found in the environment", key1)
-	}
-
-	TTLStr := os.Getenv(key2)
-	if TTLStr == "" {
-		return "", fmt.Errorf("%s is not found in the environment", key2)
-	}
-
-	TTL, err := time.ParseDuration(TTLStr)
+func (s UserService) CreateTokens(userId string) (string, string, error) {
+	m, err := auth.NewManager(s.cfg.AccessSigningKey)
 
 	if err != nil {
-		return "", err
+		return "", "", err
 	}
 
-	m, err := auth.NewManager(signingKey)
+	TTL, err := time.ParseDuration(s.cfg.AccessTTL)
+
+	accessToken, err := m.NewJWT(userId, TTL)
 
 	if err != nil {
-		return "", err
+		return "", "", err
 	}
 
-	token, err := m.NewJWT(userId, TTL)
+	m, err = auth.NewManager(s.cfg.RefreshSigningKey)
 
 	if err != nil {
-		return "", err
+		return "", "", err
 	}
 
-	return token, nil
+	TTL, err = time.ParseDuration(s.cfg.RefreshTTL)
+
+	refreshToken, err := m.NewJWT(userId, TTL)
+
+	if err != nil {
+		return "", "", err
+	}
+
+	return accessToken, refreshToken, nil
+}
+
+func (s UserService) IsValidToken(validatedToken string) (bool, error) {
+	m, err := auth.NewManager(s.cfg.RefreshSigningKey)
+	if err != nil {
+		return false, err
+	}
+
+	ok, err := m.IsValidToken(validatedToken)
+
+	return ok, err
 }
