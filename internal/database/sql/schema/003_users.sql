@@ -8,7 +8,9 @@ CREATE TABLE users (
     email TEXT NOT NULL,
     password TEXT NOT NULL,
     login TEXT NOT NULL,
-    token TEXT UNIQUE NOT NULL DEFAULT ''
+    role_id bigint NOT NULL,
+    token TEXT UNIQUE NOT NULL DEFAULT '',
+    FOREIGN KEY (role_id) REFERENCES roles(id)
 );
 
 -- +goose Down

@@ -28,7 +28,7 @@ func (q *Queries) AddToken(ctx context.Context, arg AddTokenParams) error {
 }
 
 const checkDataToLogin = `-- name: CheckDataToLogin :one
-SELECT id, email, password, login, token
+SELECT id, email, password, login, role_id, token
 FROM users
 WHERE (email = $1 AND password = $2) OR (login = $3 AND password = $2)
 `
@@ -47,6 +47,7 @@ func (q *Queries) CheckDataToLogin(ctx context.Context, arg CheckDataToLoginPara
 		&i.Email,
 		&i.Password,
 		&i.Login,
+		&i.RoleID,
 		&i.Token,
 	)
 	return i, err
@@ -71,9 +72,9 @@ func (q *Queries) CheckUserIsExist(ctx context.Context, arg CheckUserIsExistPara
 }
 
 const createUser = `-- name: CreateUser :one
-INSERT INTO users (email, password, login)
-VALUES ($1, $2, $3)
-RETURNING id, email, password, login, token
+INSERT INTO users (email, password, login, role_id)
+VALUES ($1, $2, $3, 2)
+RETURNING id, email, password, login, role_id, token
 `
 
 type CreateUserParams struct {
@@ -90,13 +91,59 @@ func (q *Queries) CreateUser(ctx context.Context, arg CreateUserParams) (User, e
 		&i.Email,
 		&i.Password,
 		&i.Login,
+		&i.RoleID,
 		&i.Token,
 	)
 	return i, err
 }
 
+const getPermissions = `-- name: GetPermissions :many
+SELECT permissions.name
+FROM roles
+JOIN roles_permissions ON roles_permissions.role_id = roles.id
+JOIN permissions ON roles_permissions.permission_id = permissions.id
+WHERE roles.name = $1
+`
+
+func (q *Queries) GetPermissions(ctx context.Context, name string) ([]string, error) {
+	rows, err := q.db.QueryContext(ctx, getPermissions, name)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []string
+	for rows.Next() {
+		var name string
+		if err := rows.Scan(&name); err != nil {
+			return nil, err
+		}
+		items = append(items, name)
+	}
+	if err := rows.Close(); err != nil {
+		return nil, err
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
+const getRole = `-- name: GetRole :one
+SELECT roles.name
+FROM users
+JOIN roles ON users.role_id = roles.id
+WHERE users.id = $1
+`
+
+func (q *Queries) GetRole(ctx context.Context, id uuid.UUID) (string, error) {
+	row := q.db.QueryRowContext(ctx, getRole, id)
+	var name string
+	err := row.Scan(&name)
+	return name, err
+}
+
 const getUser = `-- name: GetUser :one
-SELECT id, email, password, login, token
+SELECT id, email, password, login, role_id, token
 FROM users
 WHERE id = $1
 `
@@ -109,6 +156,7 @@ func (q *Queries) GetUser(ctx context.Context, id uuid.UUID) (User, error) {
 		&i.Email,
 		&i.Password,
 		&i.Login,
+		&i.RoleID,
 		&i.Token,
 	)
 	return i, err

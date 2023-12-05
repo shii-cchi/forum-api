@@ -80,7 +80,7 @@ func (h *Handler) refreshHandler(w http.ResponseWriter, r *http.Request) {
 
 	refreshToken := cookie.Value
 
-	ok, err := h.userService.IsValidToken(refreshToken)
+	ok, err := h.userService.IsValidToken(refreshToken, h.cfg.RefreshSigningKey)
 
 	if err != nil {
 		respondWithError(w, http.StatusBadRequest, fmt.Sprintf("%v", err))
@@ -114,7 +114,7 @@ func (h *Handler) refreshHandler(w http.ResponseWriter, r *http.Request) {
 func (h *Handler) logoutHandler(w http.ResponseWriter, r *http.Request) {
 	accessToken := r.Header.Get("Authorization")
 
-	ok, err := h.userService.IsValidToken(accessToken)
+	ok, err := h.userService.IsValidToken(accessToken, h.cfg.AccessSigningKey)
 
 	if err != nil {
 		respondWithError(w, http.StatusBadRequest, fmt.Sprintf("%v", err))

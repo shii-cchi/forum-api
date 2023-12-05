@@ -68,10 +68,17 @@ func (s UserService) CreateUser(ctx context.Context, newUser *dto.UserDto) (mode
 		return models.UserForResponse{}, "", err
 	}
 
+	role, err := s.GetRoleAndPermissions(ctx, user.ID)
+
+	if err != nil {
+		return models.UserForResponse{}, "", err
+	}
+
 	return models.UserForResponse{
 		ID:    user.ID,
 		Email: user.Email,
 		Login: user.Login,
+		Role:  role,
 		Token: accessToken,
 	}, refreshToken, nil
 }
@@ -128,10 +135,17 @@ func (s UserService) Login(ctx context.Context, checkedUser *dto.UserDto) (model
 		return models.UserForResponse{}, "", err
 	}
 
+	role, err := s.GetRoleAndPermissions(ctx, user.ID)
+
+	if err != nil {
+		return models.UserForResponse{}, "", err
+	}
+
 	return models.UserForResponse{
 		ID:    user.ID,
 		Email: user.Email,
 		Login: user.Login,
+		Role:  role,
 		Token: accessToken,
 	}, refreshToken, nil
 }
@@ -164,10 +178,17 @@ func (s UserService) Refresh(ctx context.Context, refreshToken string) (models.U
 		return models.UserForResponse{}, "", err
 	}
 
+	role, err := s.GetRoleAndPermissions(ctx, user.ID)
+
+	if err != nil {
+		return models.UserForResponse{}, "", err
+	}
+
 	return models.UserForResponse{
 		ID:    userId,
 		Email: user.Email,
 		Login: user.Login,
+		Role:  role,
 		Token: accessToken,
 	}, refreshToken, nil
 }
@@ -206,8 +227,8 @@ func (s UserService) createTokens(userId string) (string, string, error) {
 	return accessToken, refreshToken, nil
 }
 
-func (s UserService) IsValidToken(validatedToken string) (bool, error) {
-	m, err := auth.NewManager(s.cfg.RefreshSigningKey)
+func (s UserService) IsValidToken(validatedToken string, signingKey string) (bool, error) {
+	m, err := auth.NewManager(signingKey)
 	if err != nil {
 		return false, err
 	}
@@ -237,4 +258,23 @@ func (s UserService) GetIdFromToken(signingKey string, token string) (uuid.UUID,
 	}
 
 	return userId, nil
+}
+
+func (s UserService) GetRoleAndPermissions(ctx context.Context, userId uuid.UUID) (models.Role, error) {
+	role, err := s.queries.GetRole(ctx, userId)
+
+	if err != nil {
+		return models.Role{}, err
+	}
+
+	permissions, err := s.queries.GetPermissions(ctx, role)
+
+	if err != nil {
+		return models.Role{}, err
+	}
+
+	return models.Role{
+		Name:        role,
+		Permissions: permissions,
+	}, nil
 }
