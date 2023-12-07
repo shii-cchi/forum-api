@@ -7,7 +7,6 @@ import (
 	"github.com/shii-cchi/forum-api/internal/config"
 	"github.com/shii-cchi/forum-api/internal/database"
 	"github.com/shii-cchi/forum-api/internal/handlers/dto"
-	"github.com/shii-cchi/forum-api/internal/models"
 	"github.com/shii-cchi/forum-api/pkg/auth"
 	"github.com/shii-cchi/forum-api/pkg/hash"
 	"time"
@@ -27,24 +26,24 @@ func NewUserService(q *database.Queries, h *hash.SHA1Hasher, c *config.Config) *
 	}
 }
 
-func (s UserService) CreateUser(ctx context.Context, newUser *dto.UserDto) (models.UserForResponse, string, error) {
+func (s UserService) CreateUser(ctx context.Context, newUser *dto.UserDto) (dto.UserPreviewDto, string, error) {
 	count, err := s.queries.CheckUserIsExist(ctx, database.CheckUserIsExistParams{
 		Email: newUser.Email,
 		Login: newUser.Login,
 	})
 
 	if err != nil {
-		return models.UserForResponse{}, "", err
+		return dto.UserPreviewDto{}, "", err
 	}
 
 	if count != 0 {
-		return models.UserForResponse{}, "", errors.New("User with this login or email already exists")
+		return dto.UserPreviewDto{}, "", errors.New("User with this login or email already exists")
 	}
 
 	passwordHash, err := s.hasher.Hash(newUser.Password)
 
 	if err != nil {
-		return models.UserForResponse{}, "", err
+		return dto.UserPreviewDto{}, "", err
 	}
 
 	user, err := s.queries.CreateUser(ctx, database.CreateUserParams{
@@ -54,7 +53,7 @@ func (s UserService) CreateUser(ctx context.Context, newUser *dto.UserDto) (mode
 	})
 
 	if err != nil {
-		return models.UserForResponse{}, "", err
+		return dto.UserPreviewDto{}, "", err
 	}
 
 	accessToken, refreshToken, err := s.createTokens(user.ID.String())
@@ -65,16 +64,16 @@ func (s UserService) CreateUser(ctx context.Context, newUser *dto.UserDto) (mode
 	})
 
 	if err != nil {
-		return models.UserForResponse{}, "", err
+		return dto.UserPreviewDto{}, "", err
 	}
 
 	role, err := s.GetRoleAndPermissions(ctx, user.ID)
 
 	if err != nil {
-		return models.UserForResponse{}, "", err
+		return dto.UserPreviewDto{}, "", err
 	}
 
-	return models.UserForResponse{
+	return dto.UserPreviewDto{
 		ID:    user.ID,
 		Email: user.Email,
 		Login: user.Login,
@@ -99,31 +98,34 @@ func (s UserService) Logout(ctx context.Context, accessToken string) error {
 	return nil
 }
 
-func (s UserService) Login(ctx context.Context, checkedUser *dto.UserDto) (models.UserForResponse, string, error) {
+func (s UserService) Login(ctx context.Context, checkedUser *dto.UserDto) (dto.UserPreviewDto, string, error) {
+	user, err := s.queries.CheckDataToLogin(ctx, database.CheckDataToLoginParams{
+		Email: checkedUser.Email,
+		Login: checkedUser.Login,
+	})
+
+	if IsEmptyUser(user) {
+		return dto.UserPreviewDto{}, "", errors.New("Wrong credentials")
+	}
+
+	if err != nil {
+		return dto.UserPreviewDto{}, "", err
+	}
+
 	passwordHash, err := s.hasher.Hash(checkedUser.Password)
 
 	if err != nil {
-		return models.UserForResponse{}, "", err
+		return dto.UserPreviewDto{}, "", err
 	}
 
-	user, err := s.queries.CheckDataToLogin(ctx, database.CheckDataToLoginParams{
-		Email:    checkedUser.Email,
-		Password: passwordHash,
-		Login:    checkedUser.Login,
-	})
-
-	if err != nil {
-		return models.UserForResponse{}, "", err
-	}
-
-	if user.ID == uuid.Nil {
-		return models.UserForResponse{}, "", errors.New("Wrong credentials")
+	if passwordHash != user.Password {
+		return dto.UserPreviewDto{}, "", errors.New("Wrong credentials")
 	}
 
 	accessToken, refreshToken, err := s.createTokens(user.ID.String())
 
 	if err != nil {
-		return models.UserForResponse{}, "", err
+		return dto.UserPreviewDto{}, "", err
 	}
 
 	err = s.queries.AddToken(ctx, database.AddTokenParams{
@@ -132,16 +134,16 @@ func (s UserService) Login(ctx context.Context, checkedUser *dto.UserDto) (model
 	})
 
 	if err != nil {
-		return models.UserForResponse{}, "", err
+		return dto.UserPreviewDto{}, "", err
 	}
 
 	role, err := s.GetRoleAndPermissions(ctx, user.ID)
 
 	if err != nil {
-		return models.UserForResponse{}, "", err
+		return dto.UserPreviewDto{}, "", err
 	}
 
-	return models.UserForResponse{
+	return dto.UserPreviewDto{
 		ID:    user.ID,
 		Email: user.Email,
 		Login: user.Login,
@@ -150,17 +152,17 @@ func (s UserService) Login(ctx context.Context, checkedUser *dto.UserDto) (model
 	}, refreshToken, nil
 }
 
-func (s UserService) Refresh(ctx context.Context, refreshToken string) (models.UserForResponse, string, error) {
+func (s UserService) Refresh(ctx context.Context, refreshToken string) (dto.UserPreviewDto, string, error) {
 	userId, err := s.GetIdFromToken(s.cfg.RefreshSigningKey, refreshToken)
 
 	if err != nil {
-		return models.UserForResponse{}, "", err
+		return dto.UserPreviewDto{}, "", err
 	}
 
 	accessToken, refreshToken, err := s.createTokens(userId.String())
 
 	if err != nil {
-		return models.UserForResponse{}, "", err
+		return dto.UserPreviewDto{}, "", err
 	}
 
 	err = s.queries.AddToken(ctx, database.AddTokenParams{
@@ -169,22 +171,22 @@ func (s UserService) Refresh(ctx context.Context, refreshToken string) (models.U
 	})
 
 	if err != nil {
-		return models.UserForResponse{}, "", err
+		return dto.UserPreviewDto{}, "", err
 	}
 
-	user, err := s.queries.GetUser(ctx, userId)
+	user, err := s.queries.FindUserById(ctx, userId)
 
 	if err != nil {
-		return models.UserForResponse{}, "", err
+		return dto.UserPreviewDto{}, "", err
 	}
 
 	role, err := s.GetRoleAndPermissions(ctx, user.ID)
 
 	if err != nil {
-		return models.UserForResponse{}, "", err
+		return dto.UserPreviewDto{}, "", err
 	}
 
-	return models.UserForResponse{
+	return dto.UserPreviewDto{
 		ID:    userId,
 		Email: user.Email,
 		Login: user.Login,
@@ -260,21 +262,27 @@ func (s UserService) GetIdFromToken(signingKey string, token string) (uuid.UUID,
 	return userId, nil
 }
 
-func (s UserService) GetRoleAndPermissions(ctx context.Context, userId uuid.UUID) (models.Role, error) {
+func (s UserService) GetRoleAndPermissions(ctx context.Context, userId uuid.UUID) (dto.RoleDto, error) {
 	role, err := s.queries.GetRole(ctx, userId)
 
 	if err != nil {
-		return models.Role{}, err
+		return dto.RoleDto{}, err
 	}
 
 	permissions, err := s.queries.GetPermissions(ctx, role)
 
 	if err != nil {
-		return models.Role{}, err
+		return dto.RoleDto{}, err
 	}
 
-	return models.Role{
+	return dto.RoleDto{
 		Name:        role,
 		Permissions: permissions,
 	}, nil
+}
+
+func IsEmptyUser(user database.User) bool {
+	emptyUser := database.User{}
+
+	return emptyUser == user
 }

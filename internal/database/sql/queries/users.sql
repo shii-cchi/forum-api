@@ -21,9 +21,9 @@ WHERE id = $1;
 -- name: CheckDataToLogin :one
 SELECT *
 FROM users
-WHERE (email = $1 AND password = $2) OR (login = $3 AND password = $2);
+WHERE email = $1 OR login = $2;
 
--- name: GetUser :one
+-- name: FindUserById :one
 SELECT *
 FROM users
 WHERE id = $1;

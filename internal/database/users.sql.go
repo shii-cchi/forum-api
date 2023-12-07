@@ -30,17 +30,16 @@ func (q *Queries) AddToken(ctx context.Context, arg AddTokenParams) error {
 const checkDataToLogin = `-- name: CheckDataToLogin :one
 SELECT id, email, password, login, role_id, token
 FROM users
-WHERE (email = $1 AND password = $2) OR (login = $3 AND password = $2)
+WHERE email = $1 OR login = $2
 `
 
 type CheckDataToLoginParams struct {
-	Email    string
-	Password string
-	Login    string
+	Email string
+	Login string
 }
 
 func (q *Queries) CheckDataToLogin(ctx context.Context, arg CheckDataToLoginParams) (User, error) {
-	row := q.db.QueryRowContext(ctx, checkDataToLogin, arg.Email, arg.Password, arg.Login)
+	row := q.db.QueryRowContext(ctx, checkDataToLogin, arg.Email, arg.Login)
 	var i User
 	err := row.Scan(
 		&i.ID,
@@ -97,6 +96,26 @@ func (q *Queries) CreateUser(ctx context.Context, arg CreateUserParams) (User, e
 	return i, err
 }
 
+const findUserById = `-- name: FindUserById :one
+SELECT id, email, password, login, role_id, token
+FROM users
+WHERE id = $1
+`
+
+func (q *Queries) FindUserById(ctx context.Context, id uuid.UUID) (User, error) {
+	row := q.db.QueryRowContext(ctx, findUserById, id)
+	var i User
+	err := row.Scan(
+		&i.ID,
+		&i.Email,
+		&i.Password,
+		&i.Login,
+		&i.RoleID,
+		&i.Token,
+	)
+	return i, err
+}
+
 const getPermissions = `-- name: GetPermissions :many
 SELECT permissions.name
 FROM roles
@@ -140,26 +159,6 @@ func (q *Queries) GetRole(ctx context.Context, id uuid.UUID) (string, error) {
 	var name string
 	err := row.Scan(&name)
 	return name, err
-}
-
-const getUser = `-- name: GetUser :one
-SELECT id, email, password, login, role_id, token
-FROM users
-WHERE id = $1
-`
-
-func (q *Queries) GetUser(ctx context.Context, id uuid.UUID) (User, error) {
-	row := q.db.QueryRowContext(ctx, getUser, id)
-	var i User
-	err := row.Scan(
-		&i.ID,
-		&i.Email,
-		&i.Password,
-		&i.Login,
-		&i.RoleID,
-		&i.Token,
-	)
-	return i, err
 }
 
 const logoutUser = `-- name: LogoutUser :exec

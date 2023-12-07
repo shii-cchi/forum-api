@@ -75,7 +75,6 @@ func (h *Handler) refreshHandler(w http.ResponseWriter, r *http.Request) {
 
 		respondWithError(w, http.StatusBadRequest, fmt.Sprintf("%v", err))
 		return
-
 	}
 
 	refreshToken := cookie.Value
