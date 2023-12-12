@@ -17,7 +17,7 @@ func (h *Handler) registerHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	user, refreshToken, err := h.userService.CreateUser(r.Context(), newUser)
+	user, refreshToken, err := h.services.Users.CreateUser(r.Context(), newUser)
 
 	if err != nil {
 		respondWithError(w, http.StatusBadRequest, fmt.Sprintf("Coudn't create user: %v", err))
@@ -45,7 +45,7 @@ func (h *Handler) loginHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	user, refreshToken, err := h.userService.Login(r.Context(), checkedUser)
+	user, refreshToken, err := h.services.Users.Login(r.Context(), checkedUser)
 
 	if err != nil {
 		respondWithError(w, http.StatusBadRequest, fmt.Sprintf("Coudn't login: %v", err))
@@ -79,7 +79,7 @@ func (h *Handler) refreshHandler(w http.ResponseWriter, r *http.Request) {
 
 	refreshToken := cookie.Value
 
-	ok, err := h.userService.IsValidToken(refreshToken, h.cfg.RefreshSigningKey)
+	ok, err := h.services.Tokens.IsValidToken(refreshToken, h.cfg.RefreshSigningKey)
 
 	if err != nil {
 		respondWithError(w, http.StatusBadRequest, fmt.Sprintf("%v", err))
@@ -91,7 +91,7 @@ func (h *Handler) refreshHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	user, refreshToken, err := h.userService.Refresh(r.Context(), refreshToken)
+	user, refreshToken, err := h.services.Tokens.Refresh(r.Context(), refreshToken)
 
 	if err != nil {
 		respondWithError(w, http.StatusBadRequest, fmt.Sprintf("%v", err))
@@ -113,22 +113,15 @@ func (h *Handler) refreshHandler(w http.ResponseWriter, r *http.Request) {
 func (h *Handler) logoutHandler(w http.ResponseWriter, r *http.Request) {
 	accessToken := r.Header.Get("Authorization")
 
-	ok, err := h.userService.IsValidToken(accessToken, h.cfg.AccessSigningKey)
+	ok, err := h.services.Users.Logout(r.Context(), accessToken)
 
 	if err != nil {
-		respondWithError(w, http.StatusBadRequest, fmt.Sprintf("%v", err))
+		respondWithError(w, http.StatusBadRequest, fmt.Sprintf("Coudn't logout: %v", err))
 		return
 	}
 
 	if !ok {
 		respondWithError(w, http.StatusUnauthorized, fmt.Sprintf("Unauthorized"))
-		return
-	}
-
-	err = h.userService.Logout(r.Context(), accessToken)
-
-	if err != nil {
-		respondWithError(w, http.StatusBadRequest, fmt.Sprintf("Coudn't logout: %v", err))
 		return
 	}
 

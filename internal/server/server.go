@@ -7,6 +7,7 @@ import (
 	"github.com/shii-cchi/forum-api/internal/config"
 	"github.com/shii-cchi/forum-api/internal/database"
 	"github.com/shii-cchi/forum-api/internal/handlers"
+	"github.com/shii-cchi/forum-api/internal/service"
 	"github.com/shii-cchi/forum-api/pkg/hash"
 	"log"
 	"net/http"
@@ -34,7 +35,13 @@ func NewServer(r chi.Router) (*Server, error) {
 	queries := database.New(conn)
 	hasher := hash.NewSHA1Hasher(cfg.SaltString)
 
-	handler := handlers.New(queries, hasher, cfg)
+	services := service.NewServices(service.Deps{
+		Queries: queries,
+		Hasher:  hasher,
+		Config:  cfg,
+	})
+
+	handler := handlers.NewHandler(services, cfg)
 	handler.RegisterHTTPEndpoints(r)
 
 	log.Printf("Server starting on port %s", cfg.Port)
