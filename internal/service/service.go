@@ -16,7 +16,7 @@ type Users interface {
 }
 
 type Tokens interface {
-	Refresh(ctx context.Context, refreshToken string) (dto.UserPreviewDto, string, error)
+	Refresh(ctx context.Context, refreshToken string) (dto.UserPreviewDto, string, bool, error)
 	CreateToken(signingKey string, ttl string, userId string) (string, error)
 	CreateTokens(userId string) (string, string, error)
 	IsValidToken(validatedToken string, signingKey string) (bool, error)

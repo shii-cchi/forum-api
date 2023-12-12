@@ -24,17 +24,27 @@ func NewTokenService(q *database.Queries, c *config.Config, r *RolesPermissionsS
 	}
 }
 
-func (t TokenService) Refresh(ctx context.Context, refreshToken string) (dto.UserPreviewDto, string, error) {
+func (t TokenService) Refresh(ctx context.Context, refreshToken string) (dto.UserPreviewDto, string, bool, error) {
+	ok, err := t.IsValidToken(refreshToken, t.cfg.RefreshSigningKey)
+
+	if err != nil {
+		return dto.UserPreviewDto{}, "", false, err
+	}
+
+	if !ok {
+		return dto.UserPreviewDto{}, "", false, nil
+	}
+
 	userId, err := t.GetIdFromToken(t.cfg.RefreshSigningKey, refreshToken)
 
 	if err != nil {
-		return dto.UserPreviewDto{}, "", err
+		return dto.UserPreviewDto{}, "", false, err
 	}
 
 	accessToken, refreshToken, err := t.CreateTokens(userId.String())
 
 	if err != nil {
-		return dto.UserPreviewDto{}, "", err
+		return dto.UserPreviewDto{}, "", false, err
 	}
 
 	err = t.queries.AddToken(ctx, database.AddTokenParams{
@@ -43,19 +53,19 @@ func (t TokenService) Refresh(ctx context.Context, refreshToken string) (dto.Use
 	})
 
 	if err != nil {
-		return dto.UserPreviewDto{}, "", err
+		return dto.UserPreviewDto{}, "", false, err
 	}
 
 	user, err := t.queries.FindUserById(ctx, userId)
 
 	if err != nil {
-		return dto.UserPreviewDto{}, "", err
+		return dto.UserPreviewDto{}, "", false, err
 	}
 
 	role, err := t.rolesPermissionsService.GetRoleAndPermissions(ctx, user.ID)
 
 	if err != nil {
-		return dto.UserPreviewDto{}, "", err
+		return dto.UserPreviewDto{}, "", false, err
 	}
 
 	return dto.UserPreviewDto{
@@ -64,7 +74,7 @@ func (t TokenService) Refresh(ctx context.Context, refreshToken string) (dto.Use
 		Login: user.Login,
 		Role:  role,
 		Token: accessToken,
-	}, refreshToken, nil
+	}, refreshToken, true, nil
 }
 
 func (t TokenService) CreateToken(signingKey string, ttl string, userId string) (string, error) {

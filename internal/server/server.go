@@ -41,7 +41,7 @@ func NewServer(r chi.Router) (*Server, error) {
 		Config:  cfg,
 	})
 
-	handler := handlers.NewHandler(services, cfg)
+	handler := handlers.NewHandler(services)
 	handler.RegisterHTTPEndpoints(r)
 
 	log.Printf("Server starting on port %s", cfg.Port)

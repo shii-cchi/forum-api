@@ -79,7 +79,7 @@ func (h *Handler) refreshHandler(w http.ResponseWriter, r *http.Request) {
 
 	refreshToken := cookie.Value
 
-	ok, err := h.services.Tokens.IsValidToken(refreshToken, h.cfg.RefreshSigningKey)
+	user, refreshToken, ok, err := h.services.Tokens.Refresh(r.Context(), refreshToken)
 
 	if err != nil {
 		respondWithError(w, http.StatusBadRequest, fmt.Sprintf("%v", err))
@@ -88,13 +88,6 @@ func (h *Handler) refreshHandler(w http.ResponseWriter, r *http.Request) {
 
 	if !ok {
 		respondWithError(w, http.StatusUnauthorized, fmt.Sprintf("Unauthorized"))
-		return
-	}
-
-	user, refreshToken, err := h.services.Tokens.Refresh(r.Context(), refreshToken)
-
-	if err != nil {
-		respondWithError(w, http.StatusBadRequest, fmt.Sprintf("%v", err))
 		return
 	}
 
