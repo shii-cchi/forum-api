@@ -8,11 +8,6 @@ type UserDto struct {
 	Login    string `json:"login"`
 }
 
-type RoleDto struct {
-	Name        string   `json:"name"`
-	Permissions []string `json:"permissions"`
-}
-
 type UserPreviewDto struct {
 	ID    uuid.UUID `json:"id"`
 	Email string    `json:"email"`

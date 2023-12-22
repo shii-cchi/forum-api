@@ -7,6 +7,7 @@ import (
 	"github.com/shii-cchi/forum-api/internal/database"
 	"github.com/shii-cchi/forum-api/internal/handlers/dto"
 	"github.com/shii-cchi/forum-api/pkg/hash"
+	"reflect"
 )
 
 type UserService struct {
@@ -116,7 +117,7 @@ func (s UserService) Login(ctx context.Context, checkedUser *dto.UserDto) (dto.U
 		Login: checkedUser.Login,
 	})
 
-	if IsEmptyUser(user) {
+	if reflect.DeepEqual(user, database.User{}) {
 		return dto.UserPreviewDto{}, "", errors.New("Wrong credentials")
 	}
 
@@ -162,10 +163,4 @@ func (s UserService) Login(ctx context.Context, checkedUser *dto.UserDto) (dto.U
 		Role:  role,
 		Token: accessToken,
 	}, refreshToken, nil
-}
-
-func IsEmptyUser(user database.User) bool {
-	emptyUser := database.User{}
-
-	return emptyUser == user
 }

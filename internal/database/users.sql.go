@@ -11,22 +11,6 @@ import (
 	"github.com/google/uuid"
 )
 
-const addToken = `-- name: AddToken :exec
-UPDATE users
-SET token = $2
-WHERE id = $1
-`
-
-type AddTokenParams struct {
-	ID    uuid.UUID
-	Token string
-}
-
-func (q *Queries) AddToken(ctx context.Context, arg AddTokenParams) error {
-	_, err := q.db.ExecContext(ctx, addToken, arg.ID, arg.Token)
-	return err
-}
-
 const checkDataToLogin = `-- name: CheckDataToLogin :one
 SELECT id, email, password, login, role_id, token
 FROM users
@@ -114,51 +98,6 @@ func (q *Queries) FindUserById(ctx context.Context, id uuid.UUID) (User, error) 
 		&i.Token,
 	)
 	return i, err
-}
-
-const getPermissions = `-- name: GetPermissions :many
-SELECT permissions.name
-FROM roles
-JOIN roles_permissions ON roles_permissions.role_id = roles.id
-JOIN permissions ON roles_permissions.permission_id = permissions.id
-WHERE roles.name = $1
-`
-
-func (q *Queries) GetPermissions(ctx context.Context, name string) ([]string, error) {
-	rows, err := q.db.QueryContext(ctx, getPermissions, name)
-	if err != nil {
-		return nil, err
-	}
-	defer rows.Close()
-	var items []string
-	for rows.Next() {
-		var name string
-		if err := rows.Scan(&name); err != nil {
-			return nil, err
-		}
-		items = append(items, name)
-	}
-	if err := rows.Close(); err != nil {
-		return nil, err
-	}
-	if err := rows.Err(); err != nil {
-		return nil, err
-	}
-	return items, nil
-}
-
-const getRole = `-- name: GetRole :one
-SELECT roles.name
-FROM users
-JOIN roles ON users.role_id = roles.id
-WHERE users.id = $1
-`
-
-func (q *Queries) GetRole(ctx context.Context, id uuid.UUID) (string, error) {
-	row := q.db.QueryRowContext(ctx, getRole, id)
-	var name string
-	err := row.Scan(&name)
-	return name, err
 }
 
 const logoutUser = `-- name: LogoutUser :exec

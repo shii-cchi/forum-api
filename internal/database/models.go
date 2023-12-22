@@ -8,6 +8,13 @@ import (
 	"github.com/google/uuid"
 )
 
+type Message struct {
+	ID       uuid.UUID
+	Name     string
+	ThreadID uuid.UUID
+	AuthorID uuid.UUID
+}
+
 type Permission struct {
 	ID   int64
 	Name string
@@ -21,6 +28,32 @@ type Role struct {
 type RolesPermission struct {
 	RoleID       int64
 	PermissionID int64
+}
+
+type Section struct {
+	ID   uuid.UUID
+	Name string
+}
+
+type Subsection struct {
+	ID        uuid.UUID
+	Name      string
+	SectionID uuid.UUID
+	AuthorID  uuid.UUID
+}
+
+type Theme struct {
+	ID           uuid.UUID
+	Name         string
+	SubsectionID uuid.UUID
+	AuthorID     uuid.UUID
+}
+
+type Thread struct {
+	ID       uuid.UUID
+	Name     string
+	ThemeID  uuid.UUID
+	AuthorID uuid.UUID
 }
 
 type User struct {

@@ -2,6 +2,9 @@ package handlers
 
 import (
 	"encoding/json"
+	"fmt"
+	"github.com/go-chi/chi"
+	"github.com/google/uuid"
 	"log"
 	"net/http"
 )
@@ -28,4 +31,17 @@ func respondWithError(w http.ResponseWriter, code int, msg string) {
 	respondWithJSON(w, code, errResponse{
 		Error: msg,
 	})
+}
+
+func (h *Handler) GetIdFromURL(w http.ResponseWriter, r *http.Request) (uuid.UUID, error) {
+	idStr := chi.URLParam(r, "id")
+
+	id, err := uuid.Parse(idStr)
+
+	if err != nil {
+		respondWithError(w, http.StatusBadRequest, fmt.Sprintf("Coudn't parse str to uuid: %v", err))
+		return uuid.Nil, err
+	}
+
+	return id, nil
 }
